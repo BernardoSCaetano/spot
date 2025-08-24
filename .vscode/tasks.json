@@ -1,0 +1,22 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Spotify Downloader",
+			"type": "shell",
+			"command": "${workspaceFolder}/.venv/bin/python spotdl/main.py",
+			"group": "build",
+			"presentation": {
+				"reveal": "always"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "Run Spotify Downloader",
+			"type": "shell",
+			"command": "${workspaceFolder}/.venv/bin/python spotdl/main.py",
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}
