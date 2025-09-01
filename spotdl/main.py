@@ -1,7 +1,6 @@
 import json
 import os
 import shutil
-import sys
 import time
 
 import spotipy
@@ -450,24 +449,6 @@ def sanitize_car_filename(filename):
     return filename
 
 if __name__ == "__main__":
-    import sys
-    
-    # Check if user wants to prepare existing downloads for car audio
-    if len(sys.argv) > 1 and sys.argv[1] == "--car-audio":
-        if len(sys.argv) > 2 and not sys.argv[2].startswith("--"):
-            source_folder = sys.argv[2]
-        else:
-            # Use the most recent playlist folder
-            download_folders = [f for f in os.listdir(DOWNLOAD_DIR) 
-                              if os.path.isdir(os.path.join(DOWNLOAD_DIR, f))]
-            if not download_folders:
-                print("❌ No download folders found")
-                exit(1)
-            source_folder = os.path.join(DOWNLOAD_DIR, download_folders[-1])
-        
-        prepare_for_car_audio(source_folder, fix_metadata=True)  # Always use AI for metadata fixing
-        exit(0)
-    
     print("Connecting to Spotify...")
     try:
         tracks, playlist_download_dir = get_playlist_tracks(PLAYLIST_ID)
@@ -521,12 +502,9 @@ if __name__ == "__main__":
         else:
             print("✅ All tracks already downloaded! No new downloads needed.")
             
-            # Still offer to prepare existing files for car audio
-            print("\n🚗 Prepare existing music for car audio system? (y/n): ", end="")
-            choice = input().lower()
-            
-            if choice in ['y', 'yes']:
-                prepare_for_car_audio(playlist_download_dir, fix_metadata=True)
+            # Automatically prepare existing files for car audio anyway
+            print("\n🚗 Preparing existing music for car audio system...")
+            prepare_for_car_audio(playlist_download_dir, fix_metadata=True)
             
     except KeyboardInterrupt:
         print("\nDownload interrupted by user.")

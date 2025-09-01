@@ -20,7 +20,7 @@ This project fetches tracks from a Spotify playlist (including private playlists
 
 - Python 3.7+
 - FFmpeg (for audio conversion)
-- Ollama (for AI-powered filename generation) - *Optional but recommended*
+- Ollama (for AI-powered filename generation) - _Optional but recommended_
 
 ### 2. Installation
 
@@ -67,61 +67,68 @@ nano .env  # or use your preferred editor
 
 ## Usage
 
-### Basic Download (Recommended)
+### Basic Download (Complete Workflow)
 
 ```bash
-# Download playlist with AI-powered filename generation
+# Download playlist with automatic AI filename generation and car audio preparation
 python spotdl/main.py
 
 # This automatically:
 # 1. Downloads tracks from YouTube
 # 2. Generates clean filenames using AI
-# 3. Prepares car audio optimized files
+# 3. Prepares car audio optimized files in CarAudio/ folder
 # 4. Avoids re-downloading existing tracks
+# 5. Creates both downloads/ and CarAudio/ folders
 ```
+
+**No separate commands needed** - everything happens in one streamlined process!
 
 ### Car Audio Preparation
 
-The integrated workflow automatically prepares files for car audio systems:
+Car audio preparation is now **completely automatic** with every download:
 
 ```bash
-# Basic download (includes AI filename generation)
+# Single command does everything
 python spotdl/main.py
 
-# Car audio optimization is automatic with every download
-# Files are saved to both downloads/ and CarAudio/ folders
-
-# Manual car audio preparation for existing files
-python spotdl/main.py --car-audio "/path/to/playlist/folder"
+# No additional steps needed!
+# Car audio files are automatically created in CarAudio/ folder
 ```
 
-### AI-Powered Workflow (Integrated)
+**Automatic Car Audio Features:**
 
-The downloader now includes **always-on AI** for optimal results:
+- Creates separate CarAudio/ folder with optimized files
+- AI-generated car-friendly filenames
+- VW Passat CC compatible ID3v2.3 tags
+- FAT32-friendly file naming
+- Sequential track numbering
+
+### AI-Powered Workflow (Always-On)
+
+The downloader includes **always-on AI and car audio preparation**:
 
 ```bash
 # Set up Ollama (one-time setup)
 ./setup_ollama.sh
 
-# Download with automatic AI filename cleaning
+# Single command for complete workflow
 python spotdl/main.py
-
-# Car audio preparation with AI metadata optimization
-python spotdl/main.py --car-audio
 ```
 
-**AI Features (Automatic):**
+**Integrated Features (Automatic):**
 
 - **Smart Filenames**: AI generates clean, consistent filenames for every track
-- **Metadata Standardization**: Artist names, track titles, and album info optimized
-- **Car Audio Ready**: Files prepared with VW-compatible ID3v2.3 tags
+- **Car Audio Ready**: Files automatically prepared for VW-compatible systems
+- **Dual Output**: Both original and car-optimized files created
 - **Fallback Support**: Works without AI if Ollama unavailable
 
-**AI Improvements:**
-- Standardize artist names (e.g., "Beatles, The" → "The Beatles")
-- Clean track titles (remove "(Remastered)", version info)
-- Fix capitalization and remove problematic characters
-- Generate car-friendly filenames automatically
+**What Happens Automatically:**
+
+- Downloads tracks with AI-cleaned filenames
+- Creates original files in downloads/ folder
+- Creates car audio files in CarAudio/ folder
+- Prevents re-downloading existing tracks
+- Generates VW-compatible ID3v2.3 tags
 
 ## VS Code Integration
 
@@ -134,8 +141,7 @@ This project includes comprehensive VS Code tasks for easy development and usage
 
 ### 🎵 **Quick Tasks Available:**
 
-- **Download Playlist (Complete AI-Powered Process)** - Full workflow with AI
-- **Prepare Car Audio with AI (Latest Download)** - Convert latest download for car stereos
+- **Download Playlist (Complete AI-Powered Process + Car Audio)** - Everything in one command
 - **Start Ollama Server** - Launch AI server in background
 - **Install Ollama Models** - Set up GPT-OSS and Qwen models
 - **Setup Complete Environment** - One-click setup for everything
@@ -143,9 +149,8 @@ This project includes comprehensive VS Code tasks for easy development and usage
 ### 🔧 **Input Variables:**
 
 - **Playlist ID**: Uses your `.env` file or prompts for input
-- **Music Folder**: Defaults to downloads folder or specify custom path
 
-**Integrated Workflow**: All tasks include AI-powered filename generation and car audio optimization automatically.
+**Streamlined Workflow**: Single command does everything - downloads, AI cleaning, and car audio preparation automatically.
 
 ## Features in Detail
 
@@ -191,8 +196,9 @@ downloads/
 ```
 
 **Key Points:**
+
 - **downloads/**: Original files with full artist-song names
-- **CarAudio/**: Car stereo optimized with simplified names  
+- **CarAudio/**: Car stereo optimized with simplified names
 - **Tracking**: `.download_tracking.json` prevents duplicate downloads
 - **AI Filenames**: Both folders use AI-generated clean names
 
@@ -210,12 +216,13 @@ For optimal car stereo compatibility:
 See `requirements.txt`:
 
 - spotipy (Spotify API)
-- yt-dlp (YouTube downloads)  
+- yt-dlp (YouTube downloads)
 - mutagen (metadata handling)
 - python-dotenv (environment variables)
 - requests (AI integration)
 
 **Optional AI Dependencies:**
+
 - Ollama (local AI server for filename generation)
 - Recommended models: gpt-oss, qwen2.5:7b
 

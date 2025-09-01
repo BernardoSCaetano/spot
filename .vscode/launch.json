@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug Spotify Downloader",
+      "name": "Debug Spotify Downloader (Complete Workflow)",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/spotdl/main.py",
@@ -13,11 +13,11 @@
       }
     },
     {
-      "name": "Debug Car Audio Preparation",
+      "name": "Debug Car Audio Only (Existing Files)",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/spotdl/main.py",
-      "args": ["--car-audio"],
+      "args": ["--car-audio", "${input:musicFolder}"],
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}"
     }

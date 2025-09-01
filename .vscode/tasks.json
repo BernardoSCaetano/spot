@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Download Playlist (Complete AI-Powered Process)",
+      "label": "Download Playlist (Complete AI-Powered Process + Car Audio)",
       "type": "shell",
       "command": "${workspaceFolder}/.venv/bin/python",
       "args": ["spotdl/main.py"],
@@ -18,18 +18,7 @@
         }
       }
     },
-    {
-      "label": "Prepare Car Audio with AI (Latest Download)",
-      "type": "shell",
-      "command": "${workspaceFolder}/.venv/bin/python",
-      "args": ["spotdl/main.py", "--car-audio"],
-      "group": "build",
-      "presentation": {
-        "reveal": "always",
-        "panel": "new"
-      },
-      "problemMatcher": []
-    },
+
     {
       "label": "Start Ollama Server",
       "type": "shell",
