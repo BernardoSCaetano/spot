@@ -1,5 +1,7 @@
+import json
 import os
 import shutil
+import sys
 import time
 
 import spotipy
@@ -82,10 +84,12 @@ def get_playlist_tracks(playlist_id):
             if not item or not item.get('track'):
                 continue
             track = item['track']
+            track_id = track['id']  # Add Spotify track ID for tracking
             name = track['name']
             artists = ', '.join([artist['name'] for artist in track['artists']])
             duration_ms = track['duration_ms']
             tracks.append({
+                'id': track_id,  # Spotify track ID for tracking
                 'name': name,
                 'artists': artists,
                 'duration_ms': duration_ms,
@@ -96,8 +100,68 @@ def get_playlist_tracks(playlist_id):
         print(f"Error fetching playlist tracks: {e}")
         return [], DOWNLOAD_DIR
 
+# Download tracking system
+def get_tracking_file_path(download_dir):
+    """Get the path to the tracking JSON file for a specific playlist folder"""
+    return os.path.join(download_dir, '.download_tracking.json')
+
+def load_download_tracking(download_dir):
+    """Load the download tracking data from JSON file"""
+    tracking_file = get_tracking_file_path(download_dir)
+    try:
+        if os.path.exists(tracking_file):
+            with open(tracking_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Warning: Could not load tracking file: {e}")
+    return {}
+
+def save_download_tracking(download_dir, tracking_data):
+    """Save the download tracking data to JSON file"""
+    tracking_file = get_tracking_file_path(download_dir)
+    try:
+        with open(tracking_file, 'w', encoding='utf-8') as f:
+            json.dump(tracking_data, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"Warning: Could not save tracking file: {e}")
+
+def is_track_downloaded(track_info, download_dir, tracking_data):
+    """Check if a track has already been downloaded"""
+    track_id = track_info['id']
+    
+    # Check if track ID exists in tracking data
+    if track_id in tracking_data:
+        tracked_file = tracking_data[track_id]['file_path']
+        # Verify the file still exists
+        if os.path.exists(tracked_file):
+            return True, tracked_file
+        else:
+            # File was deleted, remove from tracking
+            del tracking_data[track_id]
+            save_download_tracking(download_dir, tracking_data)
+    
+    return False, None
+
+def add_track_to_tracking(track_info, file_path, download_dir, tracking_data):
+    """Add a successfully downloaded track to the tracking system"""
+    track_id = track_info['id']
+    tracking_data[track_id] = {
+        'name': track_info['name'],
+        'artists': track_info['artists'],
+        'file_path': file_path,
+        'download_date': time.strftime('%Y-%m-%d %H:%M:%S')
+    }
+    save_download_tracking(download_dir, tracking_data)
+
 # Download MP3 from YouTube
-def download_mp3(track_info, track_number, total_tracks, download_dir):
+def download_mp3(track_info, track_number, total_tracks, download_dir, tracking_data):
+    # Check if track is already downloaded
+    is_downloaded, existing_file = is_track_downloaded(track_info, download_dir, tracking_data)
+    if is_downloaded:
+        print(f"[{track_number}/{total_tracks}] ⏭️  Skipping (already downloaded): {track_info['artists']} - {track_info['name']}")
+        print(f"    File: {os.path.basename(existing_file)}")
+        return True
+    
     # Create optimized search query to avoid official videos
     search_query = f"{track_info['search_query']} audio -official -video -mv"
     
@@ -129,12 +193,17 @@ def download_mp3(track_info, track_number, total_tracks, download_dir):
         'match_filter': lambda info: None if info.get('duration', 0) <= max_duration else "Too long"
     }
     
-    print(f"[{track_number}/{total_tracks}] Downloading: {os.path.basename(final_path)}")
+    print(f"[{track_number}/{total_tracks}] 🔄 Downloading: {os.path.basename(final_path)}")
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
             ydl.download([f"ytsearch:{search_query}"])
-            print(f"✓ Successfully downloaded: {os.path.basename(final_path)}")
+            final_file_path = f"{final_path}.mp3"
+            if os.path.exists(final_file_path):
+                print(f"✓ Successfully downloaded: {os.path.basename(final_path)}")
+                # Add to tracking system
+                add_track_to_tracking(track_info, final_file_path, download_dir, tracking_data)
+                return True
         except Exception as e:
             print(f"✗ Failed to download {os.path.basename(final_path)}: {e}")
             # Fallback: try with just "audio" keyword
@@ -142,9 +211,16 @@ def download_mp3(track_info, track_number, total_tracks, download_dir):
             print(f"  Trying fallback search: {fallback_query}")
             try:
                 ydl.download([f"ytsearch:{fallback_query}"])
-                print(f"✓ Fallback successful: {os.path.basename(final_path)}")
+                final_file_path = f"{final_path}.mp3"
+                if os.path.exists(final_file_path):
+                    print(f"✓ Fallback successful: {os.path.basename(final_path)}")
+                    # Add to tracking system
+                    add_track_to_tracking(track_info, final_file_path, download_dir, tracking_data)
+                    return True
             except Exception as e2:
                 print(f"✗ Fallback also failed: {e2}")
+    
+    return False
 
 def sanitize_filename(filename):
     """Remove or replace characters that are problematic in filenames"""
@@ -319,18 +395,42 @@ if __name__ == "__main__":
         if not tracks:
             print("No tracks found. Please check your playlist ID and credentials.")
             exit(1)
-            
+        
+        # Load tracking data for this playlist
+        tracking_data = load_download_tracking(playlist_download_dir)
+        
         total_tracks = len(tracks)
+        new_tracks = []
+        skipped_tracks = 0
+        
+        # Check which tracks are new
+        for track in tracks:
+            is_downloaded, _ = is_track_downloaded(track, playlist_download_dir, tracking_data)
+            if not is_downloaded:
+                new_tracks.append(track)
+            else:
+                skipped_tracks += 1
+        
         print(f"Found {total_tracks} tracks in playlist.")
+        print(f"Already downloaded: {skipped_tracks} tracks")
+        print(f"New tracks to download: {len(new_tracks)} tracks")
         print(f"Download directory: {playlist_download_dir}")
-        print("Starting downloads...\n")
         
-        for i, track in enumerate(tracks, 1):
-            download_mp3(track, i, total_tracks, playlist_download_dir)
-            print()  # Empty line for better readability
-        
-        print(f"All downloads complete! Downloaded {total_tracks} tracks.")
-        print(f"Files saved to: {playlist_download_dir}")
+        if new_tracks:
+            print("Starting downloads...\n")
+            success_count = 0
+            
+            for i, track in enumerate(tracks, 1):
+                success = download_mp3(track, i, total_tracks, playlist_download_dir, tracking_data)
+                if success:
+                    success_count += 1
+                print()  # Empty line for better readability
+            
+            print(f"Downloads complete! Successfully downloaded {success_count} new tracks.")
+            print(f"Total tracks in playlist: {total_tracks}")
+            print(f"Files saved to: {playlist_download_dir}")
+        else:
+            print("✅ All tracks already downloaded! No new downloads needed.")
         
         # Ask if user wants to prepare for car audio
         print("\n🚗 Prepare music for car audio system? (y/n): ", end="")
