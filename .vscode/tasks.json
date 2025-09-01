@@ -1,22 +1,97 @@
 {
-	"version": "2.0.0",
-	"tasks": [
-		{
-			"label": "Run Spotify Downloader",
-			"type": "shell",
-			"command": "${workspaceFolder}/.venv/bin/python spotdl/main.py",
-			"group": "build",
-			"presentation": {
-				"reveal": "always"
-			},
-			"problemMatcher": []
-		},
-		{
-			"label": "Run Spotify Downloader",
-			"type": "shell",
-			"command": "${workspaceFolder}/.venv/bin/python spotdl/main.py",
-			"problemMatcher": [],
-			"group": "build"
-		}
-	]
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Download Playlist (Complete AI-Powered Process)",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["spotdl/main.py"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": [],
+      "options": {
+        "env": {
+          "PLAYLIST_ID": "${input:playlistId}"
+        }
+      }
+    },
+    {
+      "label": "Prepare Car Audio with AI (Latest Download)",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["spotdl/main.py", "--car-audio"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Start Ollama Server",
+      "type": "shell",
+      "command": "ollama",
+      "args": ["serve"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": [],
+      "isBackground": true,
+      "runOptions": {
+        "instanceLimit": 1
+      }
+    },
+    {
+      "label": "Install Ollama GPT-OSS Model",
+      "type": "shell",
+      "command": "ollama",
+      "args": ["pull", "gpt-oss"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Install Ollama Qwen Model (Fast Alternative)",
+      "type": "shell",
+      "command": "ollama",
+      "args": ["pull", "qwen2.5:7b"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Setup Complete Environment",
+      "dependsOrder": "sequence",
+      "dependsOn": ["Start Ollama Server", "Install Ollama GPT-OSS Model"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "playlistId",
+      "description": "Spotify Playlist ID",
+      "default": "${env:PLAYLIST_ID}",
+      "type": "promptString"
+    },
+    {
+      "id": "musicFolder",
+      "description": "Path to music folder for metadata fixing",
+      "default": "./spotdl/downloads",
+      "type": "promptString"
+    }
+  ]
 }

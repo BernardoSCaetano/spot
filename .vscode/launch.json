@@ -1,0 +1,39 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Spotify Downloader",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/spotdl/main.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PLAYLIST_ID": "${input:playlistId}"
+      }
+    },
+    {
+      "name": "Debug Car Audio Preparation",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/spotdl/main.py",
+      "args": ["--car-audio"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "playlistId",
+      "description": "Spotify Playlist ID",
+      "default": "${env:PLAYLIST_ID}",
+      "type": "promptString"
+    },
+    {
+      "id": "musicFolder",
+      "description": "Path to music folder for metadata fixing",
+      "default": "./spotdl/downloads",
+      "type": "promptString"
+    }
+  ]
+}

@@ -6,8 +6,12 @@ import time
 
 import spotipy
 import yt_dlp
+
+# Import our AI utilities
+from ai_utils import generate_clean_filename, get_ai_status
 from dotenv import load_dotenv
-from mutagen.id3 import ID3, TALB, TCON, TIT2, TPE1, TRCK
+from mutagen.id3 import ID3
+from mutagen.id3._frames import TALB, TCON, TIT2, TPE1, TRCK
 from mutagen.mp3 import MP3
 from spotipy.oauth2 import SpotifyOAuth
 
@@ -131,24 +135,27 @@ def is_track_downloaded(track_info, download_dir, tracking_data):
     
     # Check if track ID exists in tracking data
     if track_id in tracking_data:
-        tracked_file = tracking_data[track_id]['file_path']
+        tracked_info = tracking_data[track_id]
+        tracked_file = tracked_info['file_path']
         # Verify the file still exists
         if os.path.exists(tracked_file):
-            return True, tracked_file
+            return True, tracked_file, tracked_info.get('youtube_url')
         else:
             # File was deleted, remove from tracking
             del tracking_data[track_id]
             save_download_tracking(download_dir, tracking_data)
     
-    return False, None
+    return False, None, None
 
-def add_track_to_tracking(track_info, file_path, download_dir, tracking_data):
+def add_track_to_tracking(track_info, file_path, youtube_url, download_dir, tracking_data):
     """Add a successfully downloaded track to the tracking system"""
     track_id = track_info['id']
     tracking_data[track_id] = {
         'name': track_info['name'],
         'artists': track_info['artists'],
         'file_path': file_path,
+        'youtube_url': youtube_url,
+        'search_query': track_info['search_query'],
         'download_date': time.strftime('%Y-%m-%d %H:%M:%S')
     }
     save_download_tracking(download_dir, tracking_data)
@@ -156,11 +163,19 @@ def add_track_to_tracking(track_info, file_path, download_dir, tracking_data):
 # Download MP3 from YouTube
 def download_mp3(track_info, track_number, total_tracks, download_dir, tracking_data):
     # Check if track is already downloaded
-    is_downloaded, existing_file = is_track_downloaded(track_info, download_dir, tracking_data)
+    is_downloaded, existing_file, cached_url = is_track_downloaded(track_info, download_dir, tracking_data)
     if is_downloaded:
         print(f"[{track_number}/{total_tracks}] ⏭️  Skipping (already downloaded): {track_info['artists']} - {track_info['name']}")
-        print(f"    File: {os.path.basename(existing_file)}")
+        if existing_file:
+            print(f"    File: {os.path.basename(existing_file)}")
+        if cached_url:
+            print(f"    Cached search: {cached_url.replace('ytsearch:', '')[:50]}...")
         return True
+    
+    # Generate AI-powered clean filename
+    print(f"[{track_number}/{total_tracks}] 🤖 AI generating clean filename...")
+    clean_name = generate_clean_filename(track_info['artists'], track_info['name'])
+    print(f"    AI cleaned: {clean_name}")
     
     # Create optimized search query to avoid official videos
     search_query = f"{track_info['search_query']} audio -official -video -mv"
@@ -170,7 +185,7 @@ def download_mp3(track_info, track_number, total_tracks, download_dir, tracking_
     max_duration = expected_duration + 60  # Allow 60 seconds extra
     
     # Create clean filename with track number to prevent overwrites
-    clean_filename = f"{track_number:02d}. {track_info['artists']} - {track_info['name']}"
+    clean_filename = f"{track_number:02d}. {clean_name}"
     clean_filename = sanitize_filename(clean_filename)
     
     # Handle existing files by adding incremental numbers
@@ -182,43 +197,66 @@ def download_mp3(track_info, track_number, total_tracks, download_dir, tracking_
         counter += 1
     
     ydl_opts = {
-        'format': 'bestaudio[ext=m4a]/bestaudio/best',  # Prefer audio-only formats
+        'format': 'bestaudio[ext=mp3]/bestaudio[ext=m4a]/bestaudio/best[height<=480]',  # Prefer MP3, fallback to m4a
         'outtmpl': f'{final_path}.%(ext)s',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
         'quiet': True,
-        'match_filter': lambda info: None if info.get('duration', 0) <= max_duration else "Too long"
+        'match_filter': lambda info: None if info.get('duration', 0) <= max_duration else "Too long",
+        'noplaylist': True,
+        'extract_flat': False
     }
     
-    print(f"[{track_number}/{total_tracks}] 🔄 Downloading: {os.path.basename(final_path)}")
+    print(f"    🔄 Downloading: {os.path.basename(final_path)}")
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
-            ydl.download([f"ytsearch:{search_query}"])
-            final_file_path = f"{final_path}.mp3"
-            if os.path.exists(final_file_path):
-                print(f"✓ Successfully downloaded: {os.path.basename(final_path)}")
-                # Add to tracking system
-                add_track_to_tracking(track_info, final_file_path, download_dir, tracking_data)
-                return True
+            search_url = f"ytsearch:{search_query}"
+            ydl.download([search_url])
+            
+            # Check for downloaded file (could be .mp3 or .m4a)
+            for ext in ['.mp3', '.m4a']:
+                potential_file = f"{final_path}{ext}"
+                if os.path.exists(potential_file):
+                    # If it's m4a, rename it to mp3 for consistency
+                    if ext == '.m4a':
+                        mp3_file = f"{final_path}.mp3"
+                        os.rename(potential_file, mp3_file)
+                        final_file_path = mp3_file
+                    else:
+                        final_file_path = potential_file
+                    
+                    print(f"    ✓ Downloaded: {os.path.basename(final_file_path)}")
+                    # Add to tracking system with search query as URL reference
+                    add_track_to_tracking(track_info, final_file_path, search_url, download_dir, tracking_data)
+                    return True
+                    
         except Exception as e:
-            print(f"✗ Failed to download {os.path.basename(final_path)}: {e}")
+            print(f"    ✗ Failed to download: {e}")
             # Fallback: try with just "audio" keyword
             fallback_query = f"{track_info['search_query']} audio"
-            print(f"  Trying fallback search: {fallback_query}")
+            print(f"    🔄 Trying fallback: {fallback_query}")
             try:
-                ydl.download([f"ytsearch:{fallback_query}"])
-                final_file_path = f"{final_path}.mp3"
-                if os.path.exists(final_file_path):
-                    print(f"✓ Fallback successful: {os.path.basename(final_path)}")
-                    # Add to tracking system
-                    add_track_to_tracking(track_info, final_file_path, download_dir, tracking_data)
-                    return True
+                fallback_search = f"ytsearch:{fallback_query}"
+                ydl.download([fallback_search])
+                
+                # Check for downloaded file (could be .mp3 or .m4a)
+                for ext in ['.mp3', '.m4a']:
+                    potential_file = f"{final_path}{ext}"
+                    if os.path.exists(potential_file):
+                        # If it's m4a, rename it to mp3 for consistency
+                        if ext == '.m4a':
+                            mp3_file = f"{final_path}.mp3"
+                            os.rename(potential_file, mp3_file)
+                            final_file_path = mp3_file
+                        else:
+                            final_file_path = potential_file
+                        
+                        print(f"    ✓ Fallback successful: {os.path.basename(final_file_path)}")
+                        # Add to tracking system with fallback search
+                        add_track_to_tracking(track_info, final_file_path, fallback_search, download_dir, tracking_data)
+                        return True
+                        
             except Exception as e2:
-                print(f"✗ Fallback also failed: {e2}")
+                print(f"    ✗ Fallback also failed: {e2}")
     
     return False
 
@@ -236,7 +274,7 @@ def sanitize_filename(filename):
         filename = filename[:200]
     return filename
 
-def prepare_for_car_audio(source_dir, output_dir=None):
+def prepare_for_car_audio(source_dir, output_dir=None, fix_metadata=False):
     """
     Prepare downloaded music for car audio systems (VW Passat CC compatible)
     
@@ -245,6 +283,11 @@ def prepare_for_car_audio(source_dir, output_dir=None):
     - Car-friendly folder structure
     - Numbered filenames for proper ordering
     - FAT32 compatible names
+    
+    Args:
+        source_dir: Directory containing downloaded MP3s
+        output_dir: Output directory (default: CarAudio folder)
+        fix_metadata: Use AI to fix metadata before car preparation
     """
     if output_dir is None:
         output_dir = os.path.join(os.path.dirname(source_dir), "CarAudio")
@@ -252,6 +295,30 @@ def prepare_for_car_audio(source_dir, output_dir=None):
     print("\n🚗 Preparing music for car audio system...")
     print(f"📂 Source: {source_dir}")
     print(f"📂 Output: {output_dir}")
+    
+    # AI metadata fixing option
+    if fix_metadata:
+        print("\n🤖 AI metadata fixing enabled...")
+        try:
+            import subprocess
+            import sys
+            metadata_fixer_path = os.path.join(os.path.dirname(__file__), "metadata_fixer.py")
+            if os.path.exists(metadata_fixer_path):
+                print("Running AI metadata fixer...")
+                result = subprocess.run([
+                    sys.executable, metadata_fixer_path, source_dir
+                ], capture_output=True, text=True)
+                
+                if result.returncode == 0:
+                    print("✅ AI metadata fixing completed")
+                else:
+                    print(f"⚠️  AI metadata fixing had issues: {result.stderr}")
+                    print("Continuing with car audio preparation...")
+            else:
+                print("⚠️  metadata_fixer.py not found, skipping AI fixing")
+        except Exception as e:
+            print(f"⚠️  Could not run AI metadata fixer: {e}")
+            print("Continuing with car audio preparation...")
     
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
@@ -302,8 +369,14 @@ def prepare_for_car_audio(source_dir, output_dir=None):
                 artist = "Unknown Artist"
                 title = base_name
             
-            # Create car-friendly filename
-            car_filename = f"{i:02d} - {sanitize_car_filename(title)}.mp3"
+            # Use AI to generate clean, uniform filename for car audio
+            print(f"[{i:02d}/{len(mp3_files)}] 🤖 AI generating car audio filename...")
+            ai_clean_name = generate_clean_filename(artist, title)
+            print(f"    Original: {artist} - {title}")
+            print(f"    AI clean: {ai_clean_name}")
+            
+            # Create car-friendly filename with track number
+            car_filename = f"{i:02d} - {sanitize_car_filename(ai_clean_name)}.mp3"
             output_path = os.path.join(album_folder, car_filename)
             
             # Copy file
@@ -313,23 +386,29 @@ def prepare_for_car_audio(source_dir, output_dir=None):
             try:
                 audio = MP3(output_path, ID3=ID3)
                 
-                # Remove existing tags and add new ones (silently handle warnings)
+                # Remove existing tags first (silently handle warnings)
                 try:
                     audio.delete()
+                    audio.save()  # Save the deletion
                 except Exception:
                     pass  # Ignore if no tags exist
                 
-                # Add new tags
-                audio.add_tags()
+                # Add new tags - reload the file first
+                audio = MP3(output_path, ID3=ID3)
                 
-                # Add ID3v2.3 tags (car-compatible)
-                audio.tags.add(TIT2(encoding=1, text=title))  # Title
-                audio.tags.add(TPE1(encoding=1, text=artist))  # Artist
-                audio.tags.add(TALB(encoding=1, text=album_name))  # Album
-                audio.tags.add(TRCK(encoding=1, text=str(i)))  # Track number
-                audio.tags.add(TCON(encoding=1, text="World Music"))  # Genre
+                # Ensure we have tags to work with
+                if audio.tags is None:
+                    audio.add_tags()
                 
-                audio.save(v2_version=3)  # Save as ID3v2.3
+                # Add ID3v2.3 tags (car-compatible) - check if tags exist
+                if audio.tags is not None:
+                    audio.tags.add(TIT2(encoding=1, text=title))  # Title
+                    audio.tags.add(TPE1(encoding=1, text=artist))  # Artist
+                    audio.tags.add(TALB(encoding=1, text=album_name))  # Album
+                    audio.tags.add(TRCK(encoding=1, text=str(i)))  # Track number
+                    audio.tags.add(TCON(encoding=1, text="World Music"))  # Genre
+                    
+                    audio.save(v2_version=3)  # Save as ID3v2.3
                 
                 print(f"✓ [{i:02d}/{len(mp3_files)}] {car_filename}")
                 success_count += 1
@@ -375,7 +454,7 @@ if __name__ == "__main__":
     
     # Check if user wants to prepare existing downloads for car audio
     if len(sys.argv) > 1 and sys.argv[1] == "--car-audio":
-        if len(sys.argv) > 2:
+        if len(sys.argv) > 2 and not sys.argv[2].startswith("--"):
             source_folder = sys.argv[2]
         else:
             # Use the most recent playlist folder
@@ -386,7 +465,7 @@ if __name__ == "__main__":
                 exit(1)
             source_folder = os.path.join(DOWNLOAD_DIR, download_folders[-1])
         
-        prepare_for_car_audio(source_folder)
+        prepare_for_car_audio(source_folder, fix_metadata=True)  # Always use AI for metadata fixing
         exit(0)
     
     print("Connecting to Spotify...")
@@ -405,7 +484,7 @@ if __name__ == "__main__":
         
         # Check which tracks are new
         for track in tracks:
-            is_downloaded, _ = is_track_downloaded(track, playlist_download_dir, tracking_data)
+            is_downloaded, _, _ = is_track_downloaded(track, playlist_download_dir, tracking_data)
             if not is_downloaded:
                 new_tracks.append(track)
             else:
@@ -417,7 +496,13 @@ if __name__ == "__main__":
         print(f"Download directory: {playlist_download_dir}")
         
         if new_tracks:
-            print("Starting downloads...\n")
+            print("Starting downloads with AI-powered filename generation...\n")
+            
+            # Show AI status
+            ai_status = get_ai_status()
+            print(f"🤖 AI Status: {ai_status['status']} | Model: {ai_status['current_model']}")
+            print()
+            
             success_count = 0
             
             for i, track in enumerate(tracks, 1):
@@ -429,13 +514,19 @@ if __name__ == "__main__":
             print(f"Downloads complete! Successfully downloaded {success_count} new tracks.")
             print(f"Total tracks in playlist: {total_tracks}")
             print(f"Files saved to: {playlist_download_dir}")
+            
+            # Automatically prepare for car audio with AI metadata fixing
+            print("\n🚗 Automatically preparing music for car audio system...")
+            prepare_for_car_audio(playlist_download_dir, fix_metadata=True)
         else:
             print("✅ All tracks already downloaded! No new downloads needed.")
-        
-        # Ask if user wants to prepare for car audio
-        print("\n🚗 Prepare music for car audio system? (y/n): ", end="")
-        if input().lower() in ['y', 'yes']:
-            prepare_for_car_audio(playlist_download_dir)
+            
+            # Still offer to prepare existing files for car audio
+            print("\n🚗 Prepare existing music for car audio system? (y/n): ", end="")
+            choice = input().lower()
+            
+            if choice in ['y', 'yes']:
+                prepare_for_car_audio(playlist_download_dir, fix_metadata=True)
             
     except KeyboardInterrupt:
         print("\nDownload interrupted by user.")

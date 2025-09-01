@@ -7,10 +7,12 @@ This project fetches tracks from a Spotify playlist (including private playlists
 - 🎵 **Spotify Integration**: Authenticate with Spotify (supports private playlists)
 - 📥 **Smart Downloads**: Fetch playlist tracks and download MP3s from YouTube
 - 📁 **Auto Organization**: Creates playlist-named folders with numbered tracks
+- 🤖 **AI Metadata Fixing**: Uses local AI to clean and standardize metadata (NEW!)
 - 🚗 **Car Audio Ready**: Prepares files with proper ID3v2.3 metadata for car stereos
 - 🔍 **Optimized Search**: Avoids official videos/intros for better audio quality
 - 📊 **Progress Tracking**: Real-time download progress with success/failure indicators
 - 🛡️ **Duplicate Handling**: Prevents overwrites with intelligent file naming
+- ⏭️ **Skip Re-downloads**: Tracks already downloaded songs to avoid duplicates
 
 ## Setup
 
@@ -74,9 +76,63 @@ python spotdl/main.py
 # Prepare existing downloads for car audio
 python spotdl/main.py --car-audio
 
+# With AI metadata fixing (requires Ollama)
+python spotdl/main.py --car-audio --fix-metadata
+
 # Or specify a specific folder
 python spotdl/main.py --car-audio "/path/to/playlist/folder"
 ```
+
+### AI Metadata Fixing (Optional)
+
+Clean and standardize metadata using local AI:
+
+```bash
+# Set up Ollama (one-time setup)
+./setup_ollama.sh
+
+# Fix metadata for a folder
+python spotdl/metadata_fixer.py "path/to/music/folder"
+
+# Interactive mode (review each change)
+python spotdl/metadata_fixer.py --interactive "path/to/music/folder"
+
+# Use a different model (gpt-oss is default, qwen2.5:7b is faster)
+python spotdl/metadata_fixer.py --model qwen2.5:7b "path/to/music/folder"
+```
+
+The AI will:
+
+- Standardize artist names (e.g., "Beatles, The" → "The Beatles")
+- Clean track titles (remove "(Remastered)", version info)
+- Fix capitalization and remove problematic characters
+- Add genre information
+
+📖 **[Full AI Documentation](AI_METADATA_DOCS.md)** - Complete guide to AI metadata fixing
+
+## VS Code Integration
+
+This project includes comprehensive VS Code tasks for easy development and usage:
+
+```bash
+# Access via Command Palette (Cmd+Shift+P):
+# "Tasks: Run Task" → Select from available tasks
+```
+
+### 🎵 **Quick Tasks Available:**
+
+- **Download Playlist** - Download with playlist ID prompt
+- **Download with AI Metadata Fixing** - One-step download + AI cleaning
+- **Prepare Car Audio** - Convert latest download for car stereos
+- **Start Ollama Server** - Launch AI server in background
+- **Fix Metadata with AI** - Clean metadata for any folder
+
+### 🔧 **Input Variables:**
+
+- **Playlist ID**: Uses your `.env` file or prompts for input
+- **Music Folder**: Defaults to downloads folder or specify custom path
+
+📖 **[VS Code Tasks Guide](VSCODE_TASKS_GUIDE.md)** - Complete guide to all tasks and debug configurations
 
 ## Features in Detail
 
