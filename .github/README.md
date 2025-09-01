@@ -5,7 +5,7 @@ A Python tool that downloads tracks from Spotify playlists (including private on
 ## 🎵 Features
 
 - **Spotify Integration**: Download from private playlists with OAuth authentication
-- **Smart Search**: Optimized YouTube queries to avoid official videos/intros  
+- **Smart Search**: Optimized YouTube queries to avoid official videos/intros
 - **Car Audio Ready**: Generates ID3v2.3 metadata for maximum car stereo compatibility
 - **Auto Organization**: Creates playlist-named folders with numbered tracks
 - **Progress Tracking**: Real-time download status with success/failure indicators
@@ -18,7 +18,7 @@ A Python tool that downloads tracks from Spotify playlists (including private on
 git clone https://github.com/BernardoSCaetano/spot.git
 cd spot
 
-# 2. Install dependencies  
+# 2. Install dependencies
 pip install -r requirements.txt
 
 # 3. Setup environment
